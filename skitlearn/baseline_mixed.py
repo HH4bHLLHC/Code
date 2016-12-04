@@ -30,10 +30,12 @@ import time
 import ROOT
 from pandas import DataFrame, read_csv
 
+import pickle
+import xgboost as xgboriginal
 
-typedata="Data"
-#typedata="QCD"
-outputCentral =typedata+'_BDT_01_12_16_30h'
+#typedata="Data"
+typedata="QCD"
+outputCentral =typedata+'_BDT_03_12'
 text_file = open(outputCentral+'.txt', "w")
 subset="baseline-"
 BKG="plainQCD"
@@ -112,7 +114,7 @@ weights = "weight"
 weights1P = "weight"
 weights1M = "weight"
 
-hlFeatures = [hl for hl in dataset.columns if (str.startswith(hl, "jet")) ] #
+hlFeatures = [hl for hl in dataset.columns if (str.startswith(hl, "jetHTrest")) ] #
 FeaturesJets = hlFeatures
 
 hlFeatures = [hl for hl in dataset.columns if (str.startswith(hl, "C")) or\
@@ -130,13 +132,13 @@ text_file.write("Training full on: "+ str([var for var in trainFeaturesAll])+"\n
 
 hlFeatures = [hl for hl in dataset.columns if (str.startswith(hl, "CSV")) or (str.startswith(hl, "mX")) or\
              (str.startswith(hl, "mh1")) or (str.startswith(hl, "mh2"))  or \
-             (str.startswith(hl, "HHC"))  or (str.startswith(hl, "H1C")) or (str.startswith(hl, "H2C"))  or (str.startswith(hl, "jetHTrest")) or (str.startswith(hl, "jeteta")) ]
+             (str.startswith(hl, "HHC"))  or (str.startswith(hl, "H1C")) or (str.startswith(hl, "H2C"))  or (str.startswith(hl, "jetHTrest")) or (str.startswith(hl, "jeteta"))]
 trainFeaturesObvious = hlFeatures
 print "Training obvious on:", [var for var in trainFeaturesObvious]
 text_file.write("Training mass on: "+ str([var for var in trainFeaturesObvious])+"\n")
 
 hlFeatures = [hl for hl in dataset.columns if (str.startswith(hl, "CSV"))  or (str.startswith(hl, "jetHTrest") )or \
-             (str.startswith(hl, "HHC"))  or   (str.startswith(hl, "H1C")) or (str.startswith(hl, "H2C"))   or (str.startswith(hl, "jeteta"))   ] # (str.startswith(hl, "DR")) or or (str.startswith(hl, "mhh")) or (str.startswith(hl, "pt")) (str.startswith(hl, "HHDphi"))  or (str.startswith(hl, "H1Dphi")) or or (str.startswith(hl, "jetHTfull")) 
+             (str.startswith(hl, "HHC"))  or   (str.startswith(hl, "H1C")) or (str.startswith(hl, "H2C"))   or (str.startswith(hl, "jeteta"))    ] # (str.startswith(hl, "DR")) or or (str.startswith(hl, "mhh")) or (str.startswith(hl, "pt")) (str.startswith(hl, "HHDphi"))  or (str.startswith(hl, "H1Dphi")) or or (str.startswith(hl, "jetHTfull")) 
 trainFeaturesHH = hlFeatures
 print "Training diHiggs on:", [var for var in trainFeaturesHH]
 text_file.write( "Training angular on: "+ str([var for var in trainFeaturesHH])+"\n")
@@ -144,6 +146,7 @@ text_file.write( "Training angular on: "+ str([var for var in trainFeaturesHH])+
 #################################################################################
 ### Plot some histograms
 ################################################################################# 
+"""
 print "plain QCD"
 ### against QCD
 hist_params = {'normed': False, 'bins': 18, 'alpha': 0.4}
@@ -156,7 +159,7 @@ for n, feature in enumerate(trainFeaturesplot):
     # define range for histograms by cutting 1% of data from both ends
     if n == 0 or n == 1 or n == 2 or n == 4 or n == 5 : min_value, max_value = np.percentile(dataset[feature], [1, 99])
     else : min_value, max_value = np.percentile(dataset[feature], [1, 99])
-    #"""
+    
     if typedata=="Data": 
         values, bins, _ = plt.hist(dataset20.ix[dataset20.target.values == 0, feature].values,  weights= dataset20.ix[dataset20.target.values == 0, weights].values , 
                                range=(min_value, max_value), label=fraction+typedata, **hist_params )
@@ -165,11 +168,11 @@ for n, feature in enumerate(trainFeaturesplot):
                                range=(min_value, max_value), label=typedata, **hist_params)
     values, bins, _ = plt.hist(datasetmix.ix[datasetmix.target.values == 0, feature].values,  weights= (datasetmix.ix[datasetmix.target.values == 0, weights].values) ,  range=(min_value, max_value), label='Mixed '+typedata, **hist_params)
     areaBKG2 = sum(np.diff(bins)*values)   
-    #"""
+   
     values, bins, _ = plt.hist(dataset.ix[dataset.target.values == 1, feature].values, weights= dataset.ix[dataset.target.values == 1, weights].values , 
                                range=(min_value, max_value), label='Signal', **hist_params)
     areaSig = sum(np.diff(bins)*values)
-    #"""
+    
     #print areaBKG, " ",areaBKG2 ," ",areaSig
     if n == 0 : plt.legend(loc='best')
     plt.title(feature)
@@ -184,13 +187,12 @@ for n, feature in enumerate(trainFeaturesplot):
     # define range for histograms by cutting 1% of data from both ends
     if n == 0 or n == 1 or n == 2 or n == 4 or n == 5 : min_value, max_value = np.percentile(dataset[feature], [1, 99])
     else : min_value, max_value = np.percentile(dataset[feature], [1, 99])
-    """
-    y,binEdges = np.histogram(dataset.ix[dataset.target.values == 0, feature].values,  bins = 18)
-    bincenters = 0.5*(binEdges[1:]+binEdges[:-1])
-    menStd     = np.sqrt(y)
-    values, bins, _ = plt.hist(dataset.ix[dataset.target.values == 0, feature].values,  weights= dataset.ix[dataset.target.values == 0, weights].values , 
-                               range=(min_value, max_value), label='Background', **hist_params )
-    """
+
+    #y,binEdges = np.histogram(dataset.ix[dataset.target.values == 0, feature].values,  bins = 18)
+    #bincenters = 0.5*(binEdges[1:]+binEdges[:-1])
+    #menStd     = np.sqrt(y)
+    #values, bins, _ = plt.hist(dataset.ix[dataset.target.values == 0, feature].values,  weights= dataset.ix[dataset.target.values == 0, weights].values , 
+    #                           range=(min_value, max_value), label='Background', **hist_params )
     #plt.errorbar(bincenters, values, yerr=menStd )
     #areaBKG = sum(np.diff(bins)*values)
     #y,binEdges = np.histogram(datasetmix.ix[datasetmix.target.values == 0, feature].values,  bins = 18)
@@ -198,16 +200,17 @@ for n, feature in enumerate(trainFeaturesplot):
     #menStd     = np.sqrt(y)
     values, bins, _ = plt.hist(signalData8.ix[signalData8.target.values == 1, feature].values,  weights= (signalData8.ix[signalData8.target.values == 1, weights].values) ,  range=(min_value, max_value), label='Benchmark 8 (v1)', **hist_params)
     areaBKG2 = sum(np.diff(bins)*values)   
-    #"""
+   
     values, bins, _ = plt.hist(dataset.ix[dataset.target.values == 1, feature].values, weights= dataset.ix[dataset.target.values == 1, weights].values , 
                                range=(min_value, max_value), label='Signal SM', **hist_params)
     areaSig = sum(np.diff(bins)*values)
-    #"""
+    
     #print areaBKG, " ",areaBKG2 ," ",areaSig
     if n == 0 : plt.legend(loc='best')
     plt.title(feature)
 plt.savefig("Variables_"+subset+BKG+"_benchmarks_"+ext)
 plt.clf()
+"""
 #################################################################################
 ### Define classifiers to test
 traindataset, valdataset = train_test_split(dataset, random_state=11, train_size=0.50)
@@ -233,6 +236,7 @@ for ii in range(0,3):
      train= trainFeaturesHH
      Var='HH'
    xgb = XGBoostClassifier(train) #,
+   original = xgboriginal.XGBClassifier(train)
    """
             n_estimators =  200,
             eta = 0.1,
@@ -240,26 +244,30 @@ for ii in range(0,3):
             subsample = 0.9,
             colsample = 0.6)
    """
-   xgb.fit(traindatasetmix[train].astype(np.float64), traindatasetmix.target.astype(np.bool),\
-        sample_weight= (traindatasetmix[weights].astype(np.float64))) 
+   xgb.fit(traindatasetmix[train].astype(np.float64), traindatasetmix.target.astype(np.bool), sample_weight= (traindatasetmix[weights].astype(np.float64))) 
    prob = xgb.predict_proba(valdatasetmix[train].astype(np.float64)  )
    if ii==0 : reportAll = xgb.test_on(traindatasetmix[trainFeaturesplot].astype(np.float64), traindatasetmix.target.astype(np.bool))
    if ii==1 : reportObvious = xgb.test_on(traindatasetmix[trainFeaturesObvious].astype(np.float64), traindatasetmix.target.astype(np.bool))
    if ii==2 : reportHH = xgb.test_on(traindatasetmix[trainFeaturesHH].astype(np.float64), traindatasetmix.target.astype(np.bool))
-   joblib.dump(xgb, outputCentral+"_AppliedToMixed"+typedata+'.pkl')
+   # compatible with lustr/lxplus
+   original = xgboriginal.XGBClassifier(train).fit(traindatasetmix[train].astype(np.float64), traindatasetmix.target.astype(np.bool), sample_weight= (traindatasetmix[weights].astype(np.float64))) 
+   joblib.dump(original, outputCentral+"_"+Var+'.pkl')
+   #pickle.dump(original, open(outputCentral+"_"+Var+'.pkl', "wb"))
    print "train in mixed"
-   print 'ROC AUC '+Var+' variables:', roc_auc_score(valdatasetmix.target.astype(np.bool) , prob[:, 1] )
+   print 'ROC AUC '+Var+' variables:', roc_auc_score(valdatasetmix.target.astype(np.bool) , prob[:, 1] ) #, ' ', roc_auc_score(valdatasetmix.target.astype(np.bool) , proboriginal[:, 1] )
    text_file.write("train in mixed ROC AUC "+Var+' variables:'+str( roc_auc_score(valdatasetmix.target.astype(np.bool) , prob[:, 1] ))+"\n")
    prob.dtype = [('bdt'+Var+'Variables', np.float32)]
-   array2root(prob[:, 0], outputCentral+"_AppliedToMixed"+typedata+".root", "tree")
+   array2root(prob[:, 1], outputCentral+"_AppliedToMixed"+typedata+".root", "tree")
    prob2 = xgb.predict_proba(dataset[train].astype(np.float64))
    prob2.dtype = [('bdt'+Var+'Variables', np.float32)]
-   array2root(prob2[:, 0], outputCentral+"_AppliedToPlain"+typedata+".root", "tree")
+   array2root(prob2[:, 1], outputCentral+"_AppliedToPlain"+typedata+".root", "tree")
    if typedata=="Data": 
       prob3 = xgb.predict_proba(dataset20[train].astype(np.float64))
       prob3.dtype = [('bdt'+Var+'Variables', np.float32)]
-      array2root(prob3[:, 0], outputCentral+"_AppliedTo20pOfPlain"+typedata+".root", "tree")
+      array2root(prob3[:, 1], outputCentral+"_AppliedTo20pOfPlain"+typedata+".root", "tree")
 text_file.close()
+
+
 ################################################################################
 correlation_pairs = []
 correlation_pairs.append((trainFeaturesAll[3], trainFeaturesAll[4]))
@@ -272,8 +280,8 @@ plt.figure('ROC QCD', figsize=(7,7))
 reportAll.roc(physics_notion=True).plot(ylim=(0.7, 1))
 reportObvious.roc(physics_notion=True).plot(new_plot=False)
 reportHH.roc(physics_notion=True).plot(new_plot=False)
-plt.legend(('All variables', 'Mass variables', 'HH system'), loc='lower left')
-plt.title('QCD b enriched, train in 40%')
+plt.legend(('All variables', 'Mass-based', 'Angle-based'), loc='lower left')
+plt.title('Training in 50% of mixed data')
 plt.show()
 plt.savefig('ROC_'+subset+BKG+ext)
 plt.clf()
@@ -293,35 +301,39 @@ features_importancesHH.plot(figsize=(16,8))
 plt.savefig('ImportancesHH_'+subset+BKG+ext)
 plt.clf()
 ############################################################################
-cmap = cm.get_cmap('jet', 30)
-reportAll.features_correlation_matrix(\
-    features=dataset.ix[(dataset.target.values == 0), trainFeaturesplot].astype(np.float64), cmap=cmap).plot(new_plot=True, show_legend=False, figsize=(10, 10))
-plt.savefig('CorrelationsMatrix_AllVar_signal_'+subset+typedata+ext)  #_by_class
-plt.clf()
-reportAll.features_correlation_matrix(\
-    features=dataset.ix[(dataset.target.values == 1), trainFeaturesplot].astype(np.float64), cmap=cmap).plot(new_plot=True, show_legend=False, figsize=(10, 10))
+reportAll.features_correlation_matrix_by_class(features=trainFeaturesplot).plot(new_plot=True, show_legend=False, figsize=(10, 10))
 plt.savefig('CorrelationsMatrix_AllVar_bkg_'+subset+typedata+ext)  #_by_class
 plt.clf()
+
+cmap = cm.get_cmap('jet', 30)
+reportAll.features_correlation_matrix(features=dataset.ix[dataset.target.values == 1,trainFeaturesplot],  cmap=cmap).plot(new_plot=True, show_legend=False, figsize=(10, 10))
+plt.savefig('CorrelationsMatrix_AllVar_signal_'+subset+typedata+ext)  #_by_class
+plt.clf()
+reportAll.features_correlation_matrix(features=dataset.ix[dataset.target.values == 0,trainFeaturesplot],   cmap=cmap).plot(new_plot=True, show_legend=False, figsize=(10, 10))
+plt.savefig('CorrelationsMatrix_AllVar_bkg_'+subset+typedata+ext)  #_by_class
+plt.clf()
+
 ############################################################################
 trainFeaturesMasses  = [hl for hl in dataset.columns if (str.startswith(hl, "mX")) or (str.startswith(hl, "mh"))  or (str.startswith(hl, "pth")) or (str.startswith(hl, "HHpt")) ] #
 reportAll.features_correlation_matrix(\
-    features=dataset.ix[(dataset.target.values == 1), trainFeaturesMasses].astype(np.float64), cmap=cmap).plot(new_plot=True, show_legend=False, figsize=(4, 4))
+    features=dataset.ix[(dataset.target.values == 1), trainFeaturesMasses], cmap=cmap).plot(new_plot=True, show_legend=False, figsize=(4, 4))
 plt.savefig('CorrelationsMatrix_Masses_signal_'+subset+typedata+ext)  #_by_class
 plt.clf()
 reportAll.features_correlation_matrix(\
-    features=dataset.ix[(dataset.target.values == 0), trainFeaturesMasses].astype(np.float64), cmap=cmap).plot(new_plot=True, show_legend=False, figsize=(4, 4))
+    features=dataset.ix[(dataset.target.values == 0), trainFeaturesMasses], cmap=cmap).plot(new_plot=True, show_legend=False, figsize=(4, 4))
 plt.savefig('CorrelationsMatrix_Masses_bkg_'+subset+typedata+ext)  #_by_class
 plt.clf()
 ############################################################################
 trainFeaturesMasses  = [hl for hl in dataset.columns if (str.startswith(hl, "mX")) or (str.startswith(hl, "mh")) ] #
 reportAll.features_correlation_matrix(\
-    features=dataset.ix[(dataset.target.values == 1), trainFeaturesMasses].astype(np.float64), cmap=cmap).plot(new_plot=True, show_legend=False, figsize=(4, 4))
+    features=dataset.ix[dataset.target.values == 1, trainFeaturesMasses].astype(np.float64), cmap=cmap).plot(new_plot=True, show_legend=False, figsize=(4, 4))
 plt.savefig('CorrelationsMatrix_MassesOnly_signal_'+subset+typedata+ext)  #_by_class
 plt.clf()
 reportAll.features_correlation_matrix(\
-    features=dataset.ix[(dataset.target.values == 0), trainFeaturesMasses].astype(np.float64), cmap=cmap).plot(new_plot=True, show_legend=False, figsize=(4, 4))
+    features=dataset.ix[dataset.target.values == 0, trainFeaturesMasses].astype(np.float64), cmap=cmap).plot(new_plot=True, show_legend=False, figsize=(4, 4))
 plt.savefig('CorrelationsMatrix_MassesOnly_bkg_'+subset+typedata+ext)  #_by_class
 plt.clf()
+
 ############################################################################
 trainFeaturesMasses  = [hl for hl in dataset.columns if (str.startswith(hl, "mX")) or (str.startswith(hl, "mh1")) or (str.startswith(hl, "mh2")) or (str.startswith(hl, "HHC")) or (str.startswith(hl, "H1C")) or (str.startswith(hl, "H2C")) or (str.startswith(hl, "H1Dphi")) or (str.startswith(hl, "H2Dphi")) or (str.startswith(hl, "DR"))] #
 reportAll.features_correlation_matrix(\
@@ -417,6 +429,22 @@ ValData = pandas.DataFrame(root_numpy.root2array(outputCentral+"_AppliedToMixed"
 ValDataPlain = pandas.DataFrame(root_numpy.root2array(outputCentral+"_AppliedToPlain"+typedata+".root", treename = "tree"))
 if typedata=="Data":  ValDataPlain20 = pandas.DataFrame(root_numpy.root2array(outputCentral+"_AppliedTo20pOfPlainData.root", treename = "tree"))
 ################################################################################
+#weights= ValDataPlain.ix[(ValDataPlain20.target.values == 0) & (ValDataPlain20.bdtMassVariables.values > 0.5) ,  weights].values
+#print "Data ", ValDataPlain.ix[(ValDataPlain.target.values == 0) ].sum(), " ", ValDataPlain.ix[(ValDataPlain.target.values == 1) ,  weights].sum()
+#print "Mixed ", ValData.ix[(ValData.target.values == 0) ].sum(), " ", ValDataPlain.ix[(ValDataPlain.target.values == 1) ,  weights].sum()
+
+
+print " HH "
+for i in range(0,10) : print "> ", str(i/10.)," ",ValDataPlain.ix[(ValDataPlain.target.values == 0) & (ValDataPlain.bdtHHVariables.values > i/10.) ,  weights].sum()," ",ValData.ix[(ValData.target.values == 0) & (ValData.bdtHHVariables.values > i/10.) ,  weights].sum()," ",ValDataPlain.ix[(ValDataPlain.target.values == 1) & (ValDataPlain.bdtHHVariables.values > i/10.) ,  weights].sum()
+
+print " Mass "
+for i in range(0,10) : print "> ", str(i/10.)," ",ValDataPlain.ix[(ValDataPlain.target.values == 0) & (ValDataPlain.bdtMassVariables.values > i/10.) ,  weights].sum()," ",ValData.ix[(ValData.target.values == 0) & (ValData.bdtMassVariables.values > i/10.) ,  weights].sum()," ",ValDataPlain.ix[(ValDataPlain.target.values == 1) & (ValDataPlain.bdtMassVariables.values > i/10.) ,  weights].sum()
+ 
+print " All "
+for i in range(0,10) : print "> ", str(i/10.)," ",ValDataPlain.ix[(ValDataPlain.target.values == 0) & (ValDataPlain.bdtAllVariables.values > i/10.) ,  weights].sum()," ",ValData.ix[(ValData.target.values == 0) & (ValData.bdtAllVariables.values > i/10.) ,  weights].sum()," ",ValDataPlain.ix[(ValDataPlain.target.values == 1) & (ValDataPlain.bdtAllVariables.values > i/10.) ,  weights].sum()
+
+
+################################################################################
 hlFeatures = [hl for hl in ValData.columns if (str.startswith(hl, "mX")) or (str.startswith(hl, "mh2")) or (str.startswith(hl, "mh1"))  ] #
 trainFeaturesplotVal = hlFeatures
 hist_params = {'normed': True, 'bins': 20, 'alpha': 0.4}
@@ -434,12 +462,11 @@ if typedata=="Data" :
                                weights= (ValData.ix[(ValData.target.values == 0) & (ValData.bdtMassVariables.values > 0.5) ,  weights].values) , 
                                range=(min_value, max_value), label='Mixed '+typedata+' (Mass BDT > 0.5)', **hist_params)
     areaBKG2 = sum(np.diff(bins)*values)
-    """
-    values, bins, _ = plt.hist(valdataset.ix[(ValData.target.values == 0) & (ValData.bdtMassVariables.values > 0.8),  feature].values,\
-                               weights= valdataset.ix[(ValData.target.values == 0) & (ValData.bdtMassVariables.values > 0.8),  weights].values , 
-                               range=(min_value, max_value), label='BKG  bdtMass > 0.8', **hist_params)
-    areaSig = sum(np.diff(bins)*values)
-    """
+    #values, bins, _ = plt.hist(valdataset.ix[(ValData.target.values == 0) & (ValData.bdtMassVariables.values > 0.8),  feature].values,\
+    #                           weights= valdataset.ix[(ValData.target.values == 0) & (ValData.bdtMassVariables.values > 0.8),  weights].values , 
+    #                           range=(min_value, max_value), label='BKG  bdtMass > 0.8', **hist_params)
+    #areaSig = sum(np.diff(bins)*values)
+
     #print areaBKG," ",areaBKG2 #," ",areaSig
     if n ==1 : plt.legend(loc='best')
     plt.title(feature)
@@ -457,12 +484,10 @@ elif typedata=="QCD" :
                                weights= (ValData.ix[(ValData.target.values == 0) & (ValData.bdtMassVariables.values > 0.5) ,  weights].values) , 
                                range=(min_value, max_value), label='Mixed '+typedata+' (Mass BDT > 0.5)', **hist_params)
     areaBKG2 = sum(np.diff(bins)*values)
-    """
-    values, bins, _ = plt.hist(valdataset.ix[(ValData.target.values == 0) & (ValData.bdtMassVariables.values > 0.8),  feature].values,\
-                               weights= valdataset.ix[(ValData.target.values == 0) & (ValData.bdtMassVariables.values > 0.8),  weights].values , 
-                               range=(min_value, max_value), label='BKG  bdtMass > 0.8', **hist_params)
-    areaSig = sum(np.diff(bins)*values)
-    """
+    #values, bins, _ = plt.hist(valdataset.ix[(ValData.target.values == 0) & (ValData.bdtMassVariables.values > 0.8),  feature].values,\
+    #                           weights= valdataset.ix[(ValData.target.values == 0) & (ValData.bdtMassVariables.values > 0.8),  weights].values , 
+    #                           range=(min_value, max_value), label='BKG  bdtMass > 0.8', **hist_params)
+    #areaSig = sum(np.diff(bins)*values)
     #print areaBKG," ",areaBKG2 #," ",areaSig
     if n ==1 : plt.legend(loc='best')
     plt.title(feature)
@@ -481,12 +506,10 @@ for n, feature in enumerate(trainFeaturesplotVal):
                                weights= (ValData.ix[(ValData.target.values == 0) & (ValData.bdtMassVariables.values < 0.5) ,  weights].values) , 
                                range=(min_value, max_value), label='Mixed '+typedata+' (Mass BDT < 0.5)', **hist_params)
     areaBKG2 = sum(np.diff(bins)*values)
-    """
-    values, bins, _ = plt.hist(valdataset.ix[(ValData.target.values == 0) & (ValData.bdtMassVariables.values > 0.8),  feature].values,\
-                               weights= valdataset.ix[(ValData.target.values == 0) & (ValData.bdtMassVariables.values > 0.8),  weights].values , 
-                               range=(min_value, max_value), label='BKG  bdtMass > 0.8', **hist_params)
-    areaSig = sum(np.diff(bins)*values)
-    """
+    #values, bins, _ = plt.hist(valdataset.ix[(ValData.target.values == 0) & (ValData.bdtMassVariables.values > 0.8),  feature].values,\
+    #                           weights= valdataset.ix[(ValData.target.values == 0) & (ValData.bdtMassVariables.values > 0.8),  weights].values , 
+    #                           range=(min_value, max_value), label='BKG  bdtMass > 0.8', **hist_params)
+    #areaSig = sum(np.diff(bins)*values)
     #print areaBKG," ",areaBKG2 #," ",areaSig
     if n ==1 : plt.legend(loc='best')
     plt.title(feature)
@@ -563,12 +586,11 @@ for n, feature in enumerate(trainFeaturesplotVal):
     # define range for histograms by cutting 1% of data from both ends
     min_value, max_value = np.percentile(valdataset[feature], [1, 99])
     #selected  = ValData(logical_and(ValData.target.values == 0, ValData.bdtMassVariables.values >0.6))
-    """
-    values, bins, _ = plt.hist(ValDataPlain.ix[(ValDataPlain.target.values == 0) & (ValDataPlain.bdtHHVariables.values > 0.6) ,  feature].values,\
-                               weights= ValDataPlain.ix[(ValDataPlain.target.values == 0) & (ValDataPlain.bdtHHVariables.values > 0.6) ,  weights].values , 
-                               range=(min_value, max_value), label='Plain data (HH BDT > 0.8)', **hist_params)
-    areaBKG = sum(np.diff(bins)*values)
-    # """
+
+    #values, bins, _ = plt.hist(ValDataPlain.ix[(ValDataPlain.target.values == 0) & (ValDataPlain.bdtHHVariables.values > 0.6) ,  feature].values,\
+    #                           weights= ValDataPlain.ix[(ValDataPlain.target.values == 0) & (ValDataPlain.bdtHHVariables.values > 0.6) ,  weights].values , 
+    #                           range=(min_value, max_value), label='Plain data (HH BDT > 0.8)', **hist_params)
+    #areaBKG = sum(np.diff(bins)*values)
     values, bins, _ = plt.hist(ValData.ix[(ValData.target.values == 0) & (ValData.bdtHHVariables.values > 0.6)  ,  feature].values,\
                                weights= (ValData.ix[(ValData.target.values == 0) & (ValData.bdtHHVariables.values > 0.6)  ,  weights].values) , 
                                range=(min_value, max_value), label='Mixed '+typedata+' (HH BDT > 0.6)', **hist_params)
@@ -589,13 +611,11 @@ for n, feature in enumerate(trainFeaturesplotVal):
     plt.subplot(3, 1, n+1)
     # define range for histograms by cutting 1% of data from both ends
     min_value, max_value = np.percentile(valdataset[feature], [1, 99])
-    #selected  = ValData(logical_and(ValData.target.values == 0, ValData.bdtMassVariables.values >0.6))
-    """
-    values, bins, _ = plt.hist(ValDataPlain.ix[(ValDataPlain.target.values == 0) & (ValDataPlain.bdtHHVariables.values > 0.8) ,  feature].values,\
-                               weights= ValDataPlain.ix[(ValDataPlain.target.values == 0) & (ValDataPlain.bdtHHVariables.values > 0.8) ,  weights].values , 
-                               range=(min_value, max_value), label='Background bdtHH > 0.8', **hist_params)
-    areaBKG = sum(np.diff(bins)*values)
-    """
+
+    #values, bins, _ = plt.hist(ValDataPlain.ix[(ValDataPlain.target.values == 0) & (ValDataPlain.bdtHHVariables.values > 0.8) ,  feature].values,\
+    #                           weights= ValDataPlain.ix[(ValDataPlain.target.values == 0) & (ValDataPlain.bdtHHVariables.values > 0.8) ,  weights].values , 
+    #                           range=(min_value, max_value), label='Background bdtHH > 0.8', **hist_params)
+
     values, bins, _ = plt.hist(ValData.ix[(ValData.target.values == 1) & (ValData.bdtHHVariables.values > 0.6)  ,  feature].values,\
                                weights= (ValData.ix[(ValData.target.values == 1) & (ValData.bdtHHVariables.values > 0.6)  ,  weights].values) , 
                                range=(min_value, max_value), label='Signal bdt > 0.6', **hist_params)
@@ -607,7 +627,5 @@ for n, feature in enumerate(trainFeaturesplotVal):
 plt.savefig("Variables_"+BKG+"-"+subset+outputCentral+"HHVar_signal.png")
 plt.clf()
 #################################################################################
-# nsig nbkg after selection
-
-
+# nsig nbkg after selection"""
 
