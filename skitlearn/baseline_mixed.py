@@ -33,8 +33,8 @@ from pandas import DataFrame, read_csv
 import pickle
 import xgboost as xgboriginal
 
-#typedata="Data"
-typedata="QCD"
+typedata="Data"
+#typedata="QCD"
 outputCentral =typedata+'_BDT_03_12'
 text_file = open(outputCentral+'.txt', "w")
 subset="baseline-"
@@ -245,16 +245,24 @@ for ii in range(0,3):
             colsample = 0.6)
    """
    xgb.fit(traindatasetmix[train].astype(np.float64), traindatasetmix.target.astype(np.bool), sample_weight= (traindatasetmix[weights].astype(np.float64))) 
-   prob = xgb.predict_proba(valdatasetmix[train].astype(np.float64)  )
+   prob = xgb.predict_proba(valdatasetmix[train].astype(np.float64) )
    if ii==0 : reportAll = xgb.test_on(traindatasetmix[trainFeaturesplot].astype(np.float64), traindatasetmix.target.astype(np.bool))
    if ii==1 : reportObvious = xgb.test_on(traindatasetmix[trainFeaturesObvious].astype(np.float64), traindatasetmix.target.astype(np.bool))
    if ii==2 : reportHH = xgb.test_on(traindatasetmix[trainFeaturesHH].astype(np.float64), traindatasetmix.target.astype(np.bool))
    # compatible with lustr/lxplus
-   original = xgboriginal.XGBClassifier(train).fit(traindatasetmix[train].astype(np.float64), traindatasetmix.target.astype(np.bool), sample_weight= (traindatasetmix[weights].astype(np.float64))) 
-   joblib.dump(original, outputCentral+"_"+Var+'.pkl')
+   #features =  ['costhst_DiJets[0]_HH', 'costhst_Jets[0]_DiJets[0]', 'costhst_Jets[2]_DiJets[1]', 'CSV3', 'CSV4', 'Jets[0].eta()', 'Jets[1].eta()', 'Jets[2].eta()', 'Jets[3].eta()', 'HT_other_jets']
+   #dataout = traindatasetmix.rename(index=str, columns={'HHCost':'costhst_DiJets[0]_HH', 'H1Costbb':'costhst_Jets[0]_DiJets[0]', 'H2Costbb':'costhst_Jets[2]_DiJets[1]', 'CSV3':'CSV3', 'CSV4':'CSV4', 'jeteta1':'Jets[0].eta()', 'jeteta2':'Jets[1].eta()', 'jeteta3':'Jets[2].eta()', 'jeteta4':'Jets[3].eta()', 'jetHTrest':'HT_other_jets'})
+   #param = {'max_depth':2, 'eta':1, 'silent':1, 'objective':'binary:logistic' }
+   #num_round = 2
+   #original = xgboriginal.XGBClassifier(param, train, num_round).fit(traindatasetmix[train].astype(np.float64), traindatasetmix.target.astype(np.bool), sample_weight= (traindatasetmix[weights].astype(np.float64)))
+   #proboriginal = original.predict_proba(valdatasetmix[train].astype(np.float64)) 
+   #print proboriginal
+   #joblib.dump(original, outputCentral+"_"+Var+'.pkl')
+   joblib.dump(prob, outputCentral+"_"+Var+'.pkl')
+   #pickle.dump(prob, outputCentral+"_"+Var+'.pkl')
    #pickle.dump(original, open(outputCentral+"_"+Var+'.pkl', "wb"))
    print "train in mixed"
-   print 'ROC AUC '+Var+' variables:', roc_auc_score(valdatasetmix.target.astype(np.bool) , prob[:, 1] ) #, ' ', roc_auc_score(valdatasetmix.target.astype(np.bool) , proboriginal[:, 1] )
+   print 'ROC AUC '+Var+' variables:', roc_auc_score(valdatasetmix.target.astype(np.bool) , prob[:, 1] ) # , ' ', roc_auc_score(valdatasetmix.target.astype(np.bool) , proboriginal[:, 1] )
    text_file.write("train in mixed ROC AUC "+Var+' variables:'+str( roc_auc_score(valdatasetmix.target.astype(np.bool) , prob[:, 1] ))+"\n")
    prob.dtype = [('bdt'+Var+'Variables', np.float32)]
    array2root(prob[:, 1], outputCentral+"_AppliedToMixed"+typedata+".root", "tree")
@@ -265,6 +273,11 @@ for ii in range(0,3):
       prob3 = xgb.predict_proba(dataset20[train].astype(np.float64))
       prob3.dtype = [('bdt'+Var+'Variables', np.float32)]
       array2root(prob3[:, 1], outputCentral+"_AppliedTo20pOfPlain"+typedata+".root", "tree")
+   classifier = joblib.load(outputCentral+"_"+Var+'.pkl')
+   #classifier = pickle.load(outputCentral+"_"+Var+'.pkl')
+   print classifier
+   result  = classifier.predict_proba(dataset[train].astype(np.float64)) #.predict(data[features])  # .score() .predict()
+   print result
 text_file.close()
 
 
